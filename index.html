@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Smart Budget Tracker</title>
+
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="description" content="Smart Budget Tracker - Manage your money, expenses and budgets offline.">
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- Setup Screen -->
+    <section id="setupScreen" class="screen active">
+
+        <div class="header">
+            <h1>Smart Budget Tracker</h1>
+            <p>Setup your monthly budget</p>
+        </div>
+
+
+        <div class="card">
+
+            <label>
+                Total Available Money
+            </label>
+
+            <input 
+                id="setupMoney"
+                type="number"
+                placeholder="3000"
+            >
+
+
+            <label>
+                Currency
+            </label>
+
+            <select id="setupCurrency">
+                <option value="$">USD ($)</option>
+                <option value="€">EUR (€)</option>
+                <option value="£">GBP (£)</option>
+                <option value="﷼">QAR (﷼)</option>
+                <option value="₹">INR (₹)</option>
+            </select>
+
+
+            <label>
+                Monthly Budget Period
+            </label>
+
+            <input
+                id="setupMonth"
+                type="month"
+            >
+
+
+            <button onclick="saveSetup()">
+                Start Budget
+            </button>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- Main App -->
+
+    <main id="mainApp" class="hidden">
+
+
+        <!-- Home Dashboard -->
+
+        <section id="homePage" class="page active">
+			
+			<div class="balance-card">
+
+				<div class="balance-header">
+
+					<div>
+
+						<p class="balance-title">
+							Available Balance
+						</p>
+
+						<h1 id="availableBalance">
+							₹0
+						</h1>
+
+					</div>
+
+					<div class="balance-icon">
+						💰
+					</div>
+
+				</div>
+
+				<div class="balance-footer">
+
+					<div class="balance-item">
+
+						<small>Total Budget</small>
+
+						<h3 id="totalBudget">
+							₹0
+						</h3>
+
+					</div>
+
+					<div class="balance-item">
+
+						<small>Spent</small>
+
+						<h3 id="totalSpent">
+							₹0
+						</h3>
+
+					</div>
+
+				</div>
+
+			</div>
+
+
+            <h2>Categories</h2>
+
+            <div id="categoryDashboard" class="category-grid"></div>
+
+
+        </section>
+
+
+
+
+        <!-- Expenses Page -->
+
+        <section id="expensesPage" class="page">
+
+            <h2>Expenses</h2>
+
+            <div id="expenseList"></div>
+
+        </section>
+
+
+
+
+
+        <!-- Add Expense Page -->
+
+        <section id="addPage" class="page">
+
+
+            <h2>Add Expense</h2>
+
+
+            <div class="card">
+
+
+                <label>
+                    Amount
+                </label>
+
+                <input
+                    id="expenseAmount"
+                    type="number"
+                    placeholder="25"
+                >
+
+
+
+                <label>
+                    Category
+                </label>
+
+                <select id="expenseCategory">
+                </select>
+
+
+
+
+                <label>
+                    Date
+                </label>
+
+                <input
+                    id="expenseDate"
+                    type="date"
+                >
+
+
+
+
+                <label>
+                    Description
+                </label>
+
+
+                <input
+                    id="expenseDescription"
+                    placeholder="Lunch"
+                >
+
+
+
+                <button onclick="addExpense()">
+                    Save Expense
+                </button>
+
+
+            </div>
+
+
+        </section>
+
+
+
+
+
+
+        <!-- Categories Page -->
+
+        <section id="categoriesPage" class="page">
+
+
+            <h2>Categories</h2>
+
+
+            <button onclick="openCategoryForm()">
+                + Add Category
+            </button>
+
+
+            <div id="categoryList"></div>
+
+
+
+
+            <!-- Category Form -->
+
+
+            <div id="categoryForm" class="card hidden">
+
+
+                <h3 id="categoryFormTitle">
+                    Add Category
+                </h3>
+
+
+                <input
+                    id="categoryName"
+                    placeholder="Food"
+                >
+
+
+                <input
+                    id="categoryIcon"
+                    placeholder="🍔"
+                >
+
+
+
+                <input
+                    id="categoryColor"
+                    type="color"
+                    value="#4f46e5"
+                >
+
+
+
+                <input
+                    id="categoryLimit"
+                    type="number"
+                    placeholder="Monthly Limit"
+                >
+
+
+
+                <button onclick="saveCategory()">
+                    Save Category
+                </button>
+
+
+            </div>
+
+
+        </section>
+
+
+
+
+
+
+
+        <!-- Settings Page -->
+
+
+        <section id="settingsPage" class="page">
+
+
+            <h2>Settings</h2>
+
+
+            <div class="card">
+
+
+                <button onclick="toggleDarkMode()">
+                    Dark Mode
+                </button>
+
+
+                <button onclick="exportCSV()">
+                    Export CSV
+                </button>
+
+
+                <button onclick="backupData()">
+                    Backup Data
+                </button>
+
+
+
+                <label class="backup-upload">
+
+                    Restore Backup
+
+                    <input 
+                        type="file"
+                        id="restoreFile"
+                        onchange="restoreData(event)"
+                    >
+
+                </label>
+
+
+
+                <button onclick="monthlyReset()">
+                    Monthly Reset
+                </button>
+
+
+
+                <button class="danger" onclick="clearAllData()">
+                    Delete All Data
+                </button>
+
+
+            </div>
+
+
+        </section>
+
+
+
+    </main>
+
+
+
+
+
+
+
+    <!-- Bottom Navigation -->
+
+    <nav id="bottomNav" class="bottom-nav hidden">
+
+
+        <button onclick="showPage('homePage')">
+            🏠
+            <span>
+                Home
+            </span>
+        </button>
+
+
+
+        <button onclick="showPage('expensesPage')">
+            💳
+            <span>
+                Expenses
+            </span>
+        </button>
+
+
+
+
+        <button onclick="showPage('addPage')">
+            ➕
+            <span>
+                Add Expense
+            </span>
+        </button>
+
+
+
+
+        <button onclick="showPage('categoriesPage')">
+            📂
+            <span>
+                Categories
+            </span>
+        </button>
+
+
+
+
+        <button onclick="showPage('settingsPage')">
+            ⚙️
+            <span>
+                Settings
+            </span>
+        </button>
+
+
+    </nav>
+
+
+
+</div>
+
+
+
+<script src="app.js"></script>
+
+
+<script>
+
+if ("serviceWorker" in navigator) {
+
+    navigator.serviceWorker.register(
+        "service-worker.js"
+    );
+
+}
+
+</script>
+
+
+</body>
+</html>
