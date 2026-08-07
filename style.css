@@ -787,6 +787,101 @@ button.danger {
 
 }
 
+.dashboard-header{
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    margin-bottom:18px;
+
+}
+
+.dashboard-header h2{
+
+    font-size:24px;
+    font-weight:700;
+    color:#1f2937;
+
+}
+
+.month-select{
+
+    width:150px;
+
+    padding:8px 12px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:#f3f4f6;
+
+    font-size:14px;
+
+    font-weight:600;
+
+    color:#374151;
+
+    cursor:pointer;
+
+    outline:none;
+
+}
+
+.month-navigation{
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    gap:18px;
+
+    margin-bottom:20px;
+
+}
+
+.month-navigation button{
+
+    width:36px;
+
+    height:36px;
+
+    border:none;
+
+    border-radius:50%;
+
+    background:#6366F1;
+
+    color:#fff;
+
+    font-size:18px;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+}
+
+.month-navigation button:hover{
+
+    transform:scale(1.05);
+
+}
+
+.month-navigation span{
+
+    font-size:18px;
+
+    font-weight:700;
+
+    min-width:140px;
+
+    text-align:center;
+
+}
 
 /* Responsive */
 

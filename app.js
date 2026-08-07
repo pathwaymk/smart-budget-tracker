@@ -1,3 +1,5 @@
+let selectedMonth = "";
+let selectedCategory = null;
 let data = {
 
     budget: {
@@ -30,6 +32,8 @@ document.addEventListener(
 
     loadData();
 
+    selectedMonth = data.budget.month || thisMonth();
+
     checkSetup();
 	
 	showPage('homePage');
@@ -37,7 +41,75 @@ document.addEventListener(
 });
 
 
+function loadDashboardMonths(){
 
+    const selects = document.querySelectorAll(".dashboardMonth");
+
+    const months = [...new Set(
+        data.expenses.map(e => e.date.substring(0,7))
+    )];
+
+    if(data.budget.month && !months.includes(data.budget.month)){
+        months.push(data.budget.month);
+    }
+
+    months.sort().reverse();
+
+    selects.forEach(select => {
+        select.innerHTML = "";
+
+        months.forEach(month => {
+            const option = document.createElement("option");
+            option.value = month;
+            option.textContent = formatMonth(month);
+            if(month === selectedMonth) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    });
+
+}
+
+function formatMonth(month){
+
+    if(!month) return "";
+
+    const [year,m]=month.split("-");
+
+    const months=[
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+    ];
+
+    return months[parseInt(m)-1]+" "+year;
+
+}
+
+function changeDashboardMonth(select){
+
+    selectedMonth = select.value;
+    console.log("Selected month changed to:", selectedMonth);
+
+    updateDashboard();
+    renderExpenses();
+
+}
+
+function showExpensesPage(){
+    selectedCategory = null;
+    showPage('expensesPage');
+}
 
 
 function saveData(){
@@ -46,6 +118,8 @@ function saveData(){
         "smartBudgetData",
         JSON.stringify(data)
     );
+
+    console.log("Data saved:", data);
 
 }
 
@@ -202,12 +276,27 @@ function showPage(pageId) {
 function updateDashboard(){
 
 
+    // let spent =
+    // data.expenses
+    //     .filter(e => typeof e.date === "string" && e.date.startsWith(thisMonth()))
+    //     .reduce(
+    //         (sum,e)=>sum+e.amount,
+    //         0
+    //     );
+    loadDashboardMonths();
+
+    const monthExpenses =
+    data.expenses.filter(e=>{
+
+        return e.date.startsWith(selectedMonth);
+
+    });
+
     let spent =
-    data.expenses.reduce(
+    monthExpenses.reduce(
         (sum,e)=>sum+e.amount,
         0
     );
-
 
 
     let balance =
@@ -510,6 +599,14 @@ function deleteCategory(id){
 // Category Dashboard
 
 
+function thisMonth(){
+
+    const today = new Date();
+
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+
+}
+
 
 function renderCategoryDashboard(){
 
@@ -517,11 +614,15 @@ function renderCategoryDashboard(){
 
     box.innerHTML="";
 
+    const expenses = data.expenses.filter(e=>{
+        return e.date.startsWith(selectedMonth);
+    });
+
     data.categories.forEach(c=>{
 
-        let spent=data.expenses
-            .filter(e=>e.category===c.id)
-            .reduce((s,e)=>s+e.amount,0);
+        let spent = expenses
+        .filter(e=>e.category===c.id)
+        .reduce((s,e)=>s+e.amount,0);
 
         let percent=Math.min(
             Math.round((spent/c.limit)*100),
@@ -533,7 +634,8 @@ function renderCategoryDashboard(){
         box.innerHTML+=`
 
         <div class="category-card"
-            style="background:${c.color};">
+            style="background:${c.color};"
+            onclick="showCategoryExpenses(${c.id})">
 
             <div>
 
@@ -656,13 +758,35 @@ function addExpense() {
 
 
 
+function updateSelectedMonthLabel(){
+
+    const label = document.getElementById("selectedMonth");
+
+    if(label){
+        label.textContent = formatMonth(selectedMonth || data.budget.month || thisMonth());
+    }
+
+}
+
+function showCategoryExpenses(categoryId){
+    selectedCategory = categoryId;
+    showPage('expensesPage');
+}
+
 function renderExpenses() {
+    updateSelectedMonthLabel();
 
     const list = document.getElementById("expenseList");
 
     list.innerHTML = "";
 
-    if (data.expenses.length === 0) {
+    const expenses = data.expenses.filter(e => {
+        const monthMatch = e.date.startsWith(selectedMonth);
+        const categoryMatch = selectedCategory === null || e.category === selectedCategory;
+        return monthMatch && categoryMatch;
+    });
+
+    if (expenses.length === 0) {
 
         list.innerHTML = `
             <div class="card">
@@ -673,7 +797,7 @@ function renderExpenses() {
         return;
     }
 
-    data.expenses
+    expenses
         .slice()
         .reverse()
         .forEach(expense => {
@@ -925,5 +1049,51 @@ function clearAllData(){
         location.reload();
 
     }
+
+}
+
+function getAvailableMonths(){
+
+    const months=[...new Set(
+
+        data.expenses.map(e=>e.date.substring(0,7))
+
+    )];
+
+    months.sort();
+
+    return months;
+
+}
+
+function previousExpenseMonth(){
+
+    const months=getAvailableMonths();
+
+    let index=months.indexOf(selectedMonth);
+
+    if(index>0){
+
+        selectedMonth=months[index-1];
+
+    }
+
+    renderExpenses();
+
+}
+
+function nextExpenseMonth(){
+
+    const months=getAvailableMonths();
+
+    let index=months.indexOf(selectedMonth);
+
+    if(index<months.length-1){
+
+        selectedMonth=months[index+1];
+
+    }
+
+    renderExpenses();
 
 }

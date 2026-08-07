@@ -83,6 +83,16 @@
 
         <section id="homePage" class="page active">
 			
+            <div class="dashboard-header">
+
+                <h2>Dashboard</h2>
+
+                <select class="dashboardMonth month-select"
+                        onchange="changeDashboardMonth(this)">
+                </select>
+
+            </div>
+
 			<div class="balance-card">
 
 				<div class="balance-header">
@@ -138,23 +148,23 @@
 
 
         </section>
-
-
-
-
+             
         <!-- Expenses Page -->
 
         <section id="expensesPage" class="page">
+            <div class="dashboard-header">
 
-            <h2>Expenses</h2>
+                <h2>Expenses</h2>
+
+                <select class="dashboardMonth month-select"
+                        onchange="changeDashboardMonth(this)">
+                </select>
+
+            </div>
 
             <div id="expenseList"></div>
 
         </section>
-
-
-
-
 
         <!-- Add Expense Page -->
 
@@ -384,7 +394,7 @@
 
 
 
-        <button onclick="showPage('expensesPage')">
+        <button onclick="showExpensesPage()">
             💳
             <span>
                 Expenses
