@@ -115,36 +115,87 @@
 
 				</div>
 
-				<div class="balance-footer">
+                <div class="balance-footer">
 
-					<div class="balance-item">
+                    <div class="balance-column">
 
-						<small>Total Budget</small>
+                        <div class="balance-item">
 
-						<h3 id="totalBudget">
-							₹0
-						</h3>
+                            <small>Total Budget</small>
 
-					</div>
+                            <h3 id="totalBudget">
+                                ₹0
+                            </h3>
 
-					<div class="balance-item">
+                        </div>
 
-						<small>Spent</small>
+                        <div class="balance-item">
 
-						<h3 id="totalSpent">
-							₹0
-						</h3>
+                            <small>Daily Avg (Food + Other)</small>
 
-					</div>
+                            <h3 id="dailyAverage">
+                                ₹0
+                                <span id="avgTrend" style="margin-left:8px;color:gray">—</span>
+                            </h3>
 
-				</div>
+                        </div>
+
+                    </div>
+
+                    <div class="balance-column">
+
+                        <div class="balance-item">
+
+                            <small>Spent</small>
+
+                            <h3 id="totalSpent">
+                                ₹0
+                            </h3>
+
+                        </div>
+
+                        <div class="balance-item">
+
+                            <small>Days Left (Food + Other)</small>
+
+                            <h3 id="daysLeft">
+                                0 days
+                            </h3>
+
+                        </div>
+
+                    </div>
+
+                </div>
 
 			</div>
+
+            <!-- Spending chart moved to end of dashboard -->
 
 
             <h2>Categories</h2>
 
             <div id="categoryDashboard" class="category-grid"></div>
+
+            <div class="card" id="spendChartCard">
+
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+
+                    <h3 style="margin:0">Spending Chart</h3>
+
+                    <select id="chartMode" onchange="renderSpendingChart()">
+                        <option value="daily">Daily (1 month)</option>
+                        <option value="weekly">Weekly (1 month)</option>
+                        <option value="monthly">Monthly (1 year)</option>
+                    </select>
+
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="spendChart"></canvas>
+                </div>
+
+            </div>
 
 
         </section>
@@ -440,6 +491,7 @@
 
 
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="app.js"></script>
 
 

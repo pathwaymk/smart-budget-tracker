@@ -198,17 +198,18 @@ body {
 
     font-size:14px;
 
-    opacity:.8;
-
-    margin-bottom:8px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    justify-content:space-between;
 
 }
 
 .balance-header h1{
 
-    font-size:42px;
-
-    font-weight:bold;
+    flex: 0 0 48%;
+    box-sizing: border-box;
+    text-align:center;
 
 }
 
@@ -237,15 +238,24 @@ body {
     margin-top:30px;
 
     display:flex;
-
+    gap:12px;
     justify-content:space-between;
+    flex-wrap:wrap;
 
+}
+
+.balance-column{
+    flex: 0 0 48%;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
 }
 
 .balance-item{
 
-    flex:1;
+    width:100%;
 
+    box-sizing: border-box;
     text-align:center;
 
 }
@@ -907,4 +917,28 @@ button.danger {
 
     }
 
+}
+
+@media(max-width:480px){
+    .balance-column{
+        flex: 0 0 100%;
+    }
+}
+
+/* Chart container for responsive chart */
+.chart-container{
+    width:100%;
+    height:220px;
+}
+
+.chart-container canvas{
+    width:100% !important;
+    height:100% !important;
+    display:block;
+}
+
+@media(max-width:480px){
+    .chart-container{
+        height:160px;
+    }
 }

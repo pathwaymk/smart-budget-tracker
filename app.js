@@ -21,6 +21,7 @@ let data = {
 
 
 let editingCategory = null;
+let spendChart = null;
 
 
 
@@ -323,11 +324,113 @@ function updateDashboard(){
     ).innerText =
     money(spent);
 
+    // Daily average for Food + Other categories and trend vs yesterday
+    try {
+        const targetNames = ["food", "other"];
+
+        const targetCategoryIds = data.categories
+            .filter(c => targetNames.includes((c.name || "").toLowerCase()))
+            .map(c => c.id);
+
+        let dailyAverage = 0;
+
+        if (targetCategoryIds.length > 0) {
+            const catExpenses = data.expenses.filter(e =>
+                e.date.startsWith(selectedMonth) && targetCategoryIds.includes(e.category)
+            );
+
+            const totalCatSpent = catExpenses.reduce((s, e) => s + e.amount, 0);
+
+            const [yy, mm] = (selectedMonth || thisMonth()).split("-");
+            const year = Number(yy || new Date().getFullYear());
+            const month = Number(mm || (new Date().getMonth() + 1));
+
+            let daysInThisPeriod = 1;
+
+            if (selectedMonth === thisMonth()) {
+                daysInThisPeriod = new Date().getDate();
+            } else {
+                daysInThisPeriod = new Date(year, month, 0).getDate();
+            }
+
+            if (daysInThisPeriod < 1) daysInThisPeriod = 1;
+
+            dailyAverage = totalCatSpent / daysInThisPeriod;
+        }
+
+        const dailyEl = document.getElementById("dailyAverage");
+        if (dailyEl) {
+            dailyEl.innerHTML = `${money(dailyAverage)} <span id="avgTrend" style="margin-left:8px;color:gray">—</span>`;
+        }
+
+        // Compare today's total vs yesterday's total for target categories
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+        let todayTotal = 0;
+        let yesterdayTotal = 0;
+
+        if (targetCategoryIds.length > 0) {
+            todayTotal = data.expenses
+                .filter(e => e.date === todayStr && targetCategoryIds.includes(e.category))
+                .reduce((s, e) => s + e.amount, 0);
+
+            yesterdayTotal = data.expenses
+                .filter(e => e.date === yesterdayStr && targetCategoryIds.includes(e.category))
+                .reduce((s, e) => s + e.amount, 0);
+        }
+
+        const trendEl = document.getElementById("avgTrend");
+        if (trendEl) {
+            if (todayTotal > yesterdayTotal) {
+                trendEl.innerHTML = '<span style="color:red">↑</span>';
+            } else if (todayTotal < yesterdayTotal) {
+                trendEl.innerHTML = '<span style="color:green">↓</span>';
+            } else {
+                trendEl.innerHTML = '<span style="color:gray">—</span>';
+            }
+        }
+
+        // Calculate remaining amount in Food+Other (sum of category limits - spent this month for those categories)
+        const spentInTarget = data.expenses
+            .filter(e => e.date.startsWith(selectedMonth) && targetCategoryIds.includes(e.category))
+            .reduce((s, e) => s + e.amount, 0);
+
+        const totalLimits = data.categories
+            .filter(c => targetCategoryIds.includes(c.id))
+            .reduce((s, c) => s + (Number(c.limit) || 0), 0);
+
+        const remaining = totalLimits - spentInTarget;
+
+        let daysLeftText = '';
+
+        if (remaining <= 0) {
+            daysLeftText = `0 days`;
+        } else if (dailyAverage > 0) {
+            const daysLeft = remaining / dailyAverage;
+            const rounded = Math.floor(daysLeft);
+            daysLeftText = `${rounded} days`;
+        } else {
+            daysLeftText = `∞ days`;
+        }
+
+        const daysEl = document.getElementById('daysLeft');
+        if (daysEl) daysEl.innerText = daysLeftText;
+    } catch (e) {
+        console.error("Error calculating daily average/trend", e);
+    }
+
 
 
     renderCategoryDashboard();
 
     loadCategorySelect();
+
+    // render/update chart
+    renderSpendingChart();
 
 
 }
@@ -1096,4 +1199,125 @@ function nextExpenseMonth(){
 
     renderExpenses();
 
+}
+
+
+function getCategoryIdByName(name){
+    const lower = (name||"").toLowerCase();
+    const cat = data.categories.find(c=> (c.name||"").toLowerCase()===lower);
+    return cat ? cat.id : null;
+}
+
+
+function renderSpendingChart(){
+    const modeEl = document.getElementById('chartMode');
+    if(!modeEl) return;
+    const mode = modeEl.value || 'daily';
+
+    const foodId = getCategoryIdByName('food');
+    const otherId = getCategoryIdByName('other');
+
+    const ctx = document.getElementById('spendChart');
+    if(!ctx) return;
+
+    let labels = [];
+    let foodData = [];
+    let otherData = [];
+
+    const [selY, selM] = (selectedMonth || thisMonth()).split('-');
+    const yearNum = Number(selY || new Date().getFullYear());
+    const monthNum = Number(selM || (new Date().getMonth()+1));
+
+    if(mode === 'daily' || mode === 'weekly'){
+        // operate on selectedMonth
+        const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+
+        if(mode === 'daily'){
+            for(let d=1; d<=daysInMonth; d++){
+                const dd = String(d).padStart(2,'0');
+                const mm = String(monthNum).padStart(2,'0');
+                const dateStr = `${yearNum}-${mm}-${dd}`;
+                labels.push(String(d));
+
+                const foodSum = data.expenses.filter(e=>e.date===dateStr && e.category===foodId).reduce((s,e)=>s+e.amount,0);
+                const otherSum = data.expenses.filter(e=>e.date===dateStr && e.category===otherId).reduce((s,e)=>s+e.amount,0);
+
+                foodData.push(foodSum);
+                otherData.push(otherSum);
+            }
+        } else {
+            // weekly chunks of 7 days within month
+            const weekCount = Math.ceil(daysInMonth / 7);
+            for(let w=0; w<weekCount; w++){
+                const start = w*7 + 1;
+                const end = Math.min(start+6, daysInMonth);
+                labels.push(`Week ${w+1}`);
+                let fsum=0, osum=0;
+                for(let d=start; d<=end; d++){
+                    const dd = String(d).padStart(2,'0');
+                    const mm = String(monthNum).padStart(2,'0');
+                    const dateStr = `${yearNum}-${mm}-${dd}`;
+                    fsum += data.expenses.filter(e=>e.date===dateStr && e.category===foodId).reduce((s,e)=>s+e.amount,0);
+                    osum += data.expenses.filter(e=>e.date===dateStr && e.category===otherId).reduce((s,e)=>s+e.amount,0);
+                }
+                foodData.push(fsum);
+                otherData.push(osum);
+            }
+        }
+    }
+    else if(mode === 'monthly'){
+        // monthly for a year - use yearNum
+        const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        for(let m=1; m<=12; m++){
+            const mm = String(m).padStart(2,'0');
+            const monthStr = `${yearNum}-${mm}`;
+            labels.push(monthNames[m-1]);
+            const fsum = data.expenses.filter(e=>e.date.startsWith(monthStr) && e.category===foodId).reduce((s,e)=>s+e.amount,0);
+            const osum = data.expenses.filter(e=>e.date.startsWith(monthStr) && e.category===otherId).reduce((s,e)=>s+e.amount,0);
+            foodData.push(fsum);
+            otherData.push(osum);
+        }
+    }
+
+    // prepare chart
+    if(window.Chart && ctx){
+        if(spendChart){
+            spendChart.destroy();
+            spendChart = null;
+        }
+
+        spendChart = new Chart(ctx.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: 'Food',
+                        data: foodData,
+                        borderColor: '#ff7a59',
+                        backgroundColor: 'rgba(255,122,89,0.12)',
+                        tension: 0.3,
+                        fill: true
+                    },
+                    {
+                        label: 'Other',
+                        data: otherData,
+                        borderColor: '#59a2ff',
+                        backgroundColor: 'rgba(89,162,255,0.12)',
+                        tension: 0.3,
+                        fill: true
+                    }
+                ]
+            },
+            options: {
+                plugins: {
+                    legend: { position: 'bottom' }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                },
+                maintainAspectRatio: false
+            }
+        });
+    }
 }
