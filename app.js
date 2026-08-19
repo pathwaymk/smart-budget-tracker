@@ -264,6 +264,7 @@ function showPage(pageId) {
         case "addPage":
             loadCategorySelect();
             break;
+
     }
 }
 
@@ -333,6 +334,7 @@ function updateDashboard(){
             .map(c => c.id);
 
         let dailyAverage = 0;
+        let daysInThisPeriod = 1;
 
         if (targetCategoryIds.length > 0) {
             const catExpenses = data.expenses.filter(e =>
@@ -344,8 +346,6 @@ function updateDashboard(){
             const [yy, mm] = (selectedMonth || thisMonth()).split("-");
             const year = Number(yy || new Date().getFullYear());
             const month = Number(mm || (new Date().getMonth() + 1));
-
-            let daysInThisPeriod = 1;
 
             if (selectedMonth === thisMonth()) {
                 daysInThisPeriod = new Date().getDate();
@@ -404,6 +404,26 @@ function updateDashboard(){
             .reduce((s, c) => s + (Number(c.limit) || 0), 0);
 
         const remaining = totalLimits - spentInTarget;
+
+        // survival daily average: half of the combined Food+Other limits (or fallback to overall budget)
+        const combinedLimits = (Number(totalLimits) || 0) || (Number(data.budget.total) || 0);
+        // total days in the selected month (always full month length, used only for survival calculation)
+        const daysInMonthTotal = (function(){
+            const [yy, mm] = (selectedMonth || thisMonth()).split('-');
+            const year = Number(yy || new Date().getFullYear());
+            const month = Number(mm || (new Date().getMonth() + 1));
+            return new Date(year, month, 0).getDate();
+        })();
+        const survivalDaily = combinedLimits / 2 / (daysInMonthTotal || 1);
+        console.log("Combined limits:", combinedLimits, "Survival daily average:", survivalDaily, "Remaining:", remaining, "Daily average:", dailyAverage, "Days in period:", daysInThisPeriod, "Days in month total:", daysInMonthTotal);
+        // color daily average red if actual dailyAverage > survivalDaily
+        if (dailyEl) {
+            if (dailyAverage > survivalDaily) {
+                dailyEl.style.color = 'red';
+            } else {
+                dailyEl.style.color = 'green';
+            }
+        }
 
         let daysLeftText = '';
 
@@ -857,6 +877,82 @@ function addExpense() {
 }
 
 
+function deleteExpense(id){
+    if(!confirm("Delete this expense?")) return;
+    data.expenses = data.expenses.filter(e => e.id !== id);
+    saveData();
+    updateDashboard();
+    renderExpenses();
+    showPage('expensesPage');
+}
+
+
+// Attach swipe-to-delete handlers to rendered expense items.
+function attachSwipeHandlers(){
+    const items = document.querySelectorAll('.expense-item');
+    items.forEach(item => {
+        if(item.dataset.swipeAttached) return;
+        item.dataset.swipeAttached = '1';
+
+        const id = Number(item.getAttribute('data-id'));
+        let startX = 0;
+        let currentX = 0;
+        let touching = false;
+        const threshold = 80;
+
+        const setTransform = (tx) => {
+            item.style.transform = `translateX(${tx}px)`;
+        };
+
+        const onStart = (e) => {
+            touching = true;
+            startX = e.touches ? e.touches[0].clientX : e.clientX;
+            currentX = startX;
+            item.style.transition = '';
+        };
+
+        const onMove = (e) => {
+            if(!touching) return;
+            currentX = e.touches ? e.touches[0].clientX : e.clientX;
+            const dx = currentX - startX;
+            if(dx > 0){
+                setTransform(dx);
+            } else {
+                setTransform(0);
+            }
+        };
+
+        const onEnd = () => {
+            if(!touching) return;
+            touching = false;
+            const dx = currentX - startX;
+            if(dx > threshold){
+                // animate out then delete
+                item.style.transition = 'transform 200ms ease-out, opacity 200ms';
+                setTransform(window.innerWidth);
+                item.style.opacity = '0';
+                setTimeout(()=>{
+                    deleteExpense(id);
+                }, 200);
+            } else {
+                item.style.transition = 'transform 150ms ease-out';
+                setTransform(0);
+            }
+        };
+
+        item.addEventListener('touchstart', onStart, {passive:true});
+        item.addEventListener('touchmove', onMove, {passive:true});
+        item.addEventListener('touchend', onEnd);
+
+        // mouse fallback for desktop drag
+        let mouseDown = false;
+        item.addEventListener('mousedown', (e) => { mouseDown = true; onStart(e); });
+        window.addEventListener('mousemove', (e) => { if(!mouseDown) return; onMove(e); });
+        window.addEventListener('mouseup', (e) => { if(!mouseDown) return; mouseDown = false; onEnd(e); });
+    });
+}
+
+
 
 
 
@@ -910,7 +1006,7 @@ function renderExpenses() {
             );
 
             list.innerHTML += `
-                <div class="expense-item">
+                <div class="expense-item" data-id="${expense.id}">
 
                     <div class="expense-info">
 
@@ -934,6 +1030,9 @@ function renderExpenses() {
             `;
 
         });
+
+    // Attach swipe handlers after rendering
+    setTimeout(attachSwipeHandlers, 0);
 
 }
 
@@ -1221,12 +1320,15 @@ function renderSpendingChart(){
     if(!ctx) return;
 
     let labels = [];
+    let tooltipLabels = [];
+    let weekRanges = []; // array of {start: 'YYYY-MM-DD', end: 'YYYY-MM-DD'} for weekly mode
     let foodData = [];
     let otherData = [];
 
     const [selY, selM] = (selectedMonth || thisMonth()).split('-');
     const yearNum = Number(selY || new Date().getFullYear());
     const monthNum = Number(selM || (new Date().getMonth()+1));
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
     if(mode === 'daily' || mode === 'weekly'){
         // operate on selectedMonth
@@ -1246,22 +1348,51 @@ function renderSpendingChart(){
                 otherData.push(otherSum);
             }
         } else {
-            // weekly chunks of 7 days within month
-            const weekCount = Math.ceil(daysInMonth / 7);
-            for(let w=0; w<weekCount; w++){
-                const start = w*7 + 1;
-                const end = Math.min(start+6, daysInMonth);
-                labels.push(`Week ${w+1}`);
-                let fsum=0, osum=0;
-                for(let d=start; d<=end; d++){
-                    const dd = String(d).padStart(2,'0');
-                    const mm = String(monthNum).padStart(2,'0');
-                    const dateStr = `${yearNum}-${mm}-${dd}`;
+            // calendar weeks: Sunday -> Saturday, include only days inside the selected month
+            const firstDate = new Date(yearNum, monthNum-1, 1);
+            const lastDate = new Date(yearNum, monthNum-1, daysInMonth);
+            const firstWeekStart = new Date(firstDate);
+            firstWeekStart.setDate(firstDate.getDate() - firstDate.getDay());
+
+            let weekStart = new Date(firstWeekStart);
+
+            while(weekStart <= lastDate){
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekStart.getDate() + 6);
+
+                const inStart = weekStart < firstDate ? new Date(firstDate) : new Date(weekStart);
+                const inEnd = weekEnd > lastDate ? new Date(lastDate) : new Date(weekEnd);
+
+                if(inStart > inEnd){
+                    weekStart.setDate(weekStart.getDate() + 7);
+                    continue;
+                }
+
+                const startMonthName = monthNames[inStart.getMonth()];
+                const endMonthName = monthNames[inEnd.getMonth()];
+                const rangeLabel = `${startMonthName} ${inStart.getDate()} - ${endMonthName} ${inEnd.getDate()}`;
+                tooltipLabels.push(rangeLabel);
+                labels.push(`Week ${tooltipLabels.length}`);
+                weekRanges.push({
+                    start: `${inStart.getFullYear()}-${String(inStart.getMonth()+1).padStart(2,'0')}-${String(inStart.getDate()).padStart(2,'0')}`,
+                    end: `${inEnd.getFullYear()}-${String(inEnd.getMonth()+1).padStart(2,'0')}-${String(inEnd.getDate()).padStart(2,'0')}`
+                });
+
+                let fsum = 0, osum = 0;
+                // sum expenses for days from inStart..inEnd
+                for(let d = new Date(inStart); d <= inEnd; d.setDate(d.getDate() + 1)){
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2,'0');
+                    const dd = String(d.getDate()).padStart(2,'0');
+                    const dateStr = `${yyyy}-${mm}-${dd}`;
                     fsum += data.expenses.filter(e=>e.date===dateStr && e.category===foodId).reduce((s,e)=>s+e.amount,0);
                     osum += data.expenses.filter(e=>e.date===dateStr && e.category===otherId).reduce((s,e)=>s+e.amount,0);
                 }
+
                 foodData.push(fsum);
                 otherData.push(osum);
+
+                weekStart.setDate(weekStart.getDate() + 7);
             }
         }
     }
@@ -1280,7 +1411,7 @@ function renderSpendingChart(){
     }
 
     // prepare chart
-    if(window.Chart && ctx){
+        if(window.Chart && ctx){
         if(spendChart){
             spendChart.destroy();
             spendChart = null;
@@ -1311,7 +1442,20 @@ function renderSpendingChart(){
             },
             options: {
                 plugins: {
-                    legend: { position: 'bottom' }
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            title: function(items){
+                                if(!items || !items[0]) return '';
+                                const idx = items[0].dataIndex;
+                                return (tooltipLabels && tooltipLabels[idx]) || (items[0].label || '');
+                            },
+                            label: function(item){
+                                const val = (item.parsed && item.parsed.y !== undefined) ? item.parsed.y : item.raw;
+                                return item.dataset.label + ': ' + money(val);
+                            }
+                        }
+                    }
                 },
                 scales: {
                     y: { beginAtZero: true }
@@ -1319,5 +1463,105 @@ function renderSpendingChart(){
                 maintainAspectRatio: false
             }
         });
+
+        // attach dblclick handler to navigate to expenses for the clicked week/category
+        try {
+            if(ctx._dblHandler){
+                ctx.removeEventListener('dblclick', ctx._dblHandler);
+                ctx._dblHandler = null;
+            }
+
+            const dblHandler = function(evt){
+                const points = spendChart.getElementsAtEventForMode(evt, 'nearest', {intersect: true}, true);
+                if(!points || !points.length) return;
+                const pt = points[0];
+                const dataIndex = pt.index;
+                const datasetIndex = pt.datasetIndex;
+                const catId = datasetIndex === 0 ? foodId : otherId;
+
+                let start = null;
+                let end = null;
+
+                if(mode === 'weekly'){
+                    if(!weekRanges.length) return;
+                    const range = weekRanges[dataIndex];
+                    if(!range) return;
+                    start = range.start;
+                    end = range.end;
+                }
+                else if(mode === 'daily'){
+                    const day = dataIndex + 1;
+                    const mm = String(monthNum).padStart(2,'0');
+                    const dd = String(day).padStart(2,'0');
+                    start = `${yearNum}-${mm}-${dd}`;
+                    end = start;
+                }
+                else if(mode === 'monthly'){
+                    const m = dataIndex + 1;
+                    const mm = String(m).padStart(2,'0');
+                    const lastDay = new Date(yearNum, m, 0).getDate();
+                    start = `${yearNum}-${mm}-01`;
+                    end = `${yearNum}-${mm}-${String(lastDay).padStart(2,'0')}`;
+                }
+                else {
+                    return;
+                }
+
+                showExpensesForRange(catId, start, end);
+            };
+
+            ctx.addEventListener('dblclick', dblHandler);
+            ctx._dblHandler = dblHandler;
+        } catch(e){
+            console.error('Failed to attach dblclick handler to chart', e);
+        }
     }
 }
+
+
+// Show expenses for a specific category within a date range (inclusive)
+function showExpensesForRange(categoryId, startISO, endISO){
+
+    selectedCategory = categoryId;
+
+    showPage('expensesPage');
+
+    const list = document.getElementById('expenseList');
+    list.innerHTML = '';
+
+    const expenses = data.expenses.filter(e => {
+        return e.category === categoryId && e.date >= startISO && e.date <= endISO;
+    }).sort((a,b)=> a.date.localeCompare(b.date));
+
+    if(expenses.length === 0){
+        list.innerHTML = `
+            <div class="card">
+                <h3>No expenses</h3>
+                <p>No expenses for this period.</p>
+            </div>
+        `;
+        return;
+    }
+
+    expenses.reverse().forEach(expense=>{
+        const category = data.categories.find(c=>c.id===expense.category);
+        list.innerHTML += `
+            <div class="expense-item" data-id="${expense.id}">
+                <div class="expense-info">
+                    <h3>${category ? category.icon : '📌'} ${category ? category.name : 'Unknown'}</h3>
+                    <small>${expense.description || 'No description'}</small>
+                    <br>
+                    <small>${expense.date}</small>
+                </div>
+                <div>
+                    <strong>${money(expense.amount)}</strong>
+                </div>
+            </div>
+        `;
+    });
+
+    // Attach swipe handlers for range-filtered expenses
+    setTimeout(attachSwipeHandlers, 0);
+
+}
+
