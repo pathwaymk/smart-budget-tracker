@@ -1444,6 +1444,14 @@ function renderSpendingChart(){
                         backgroundColor: 'rgba(89,162,255,0.12)',
                         tension: 0.3,
                         fill: true
+                    },
+                    {
+                        label: 'Total Expenses',
+                        data: foodData.map((value, index) => value + otherData[index]),
+                        borderColor: '#16a34a',
+                        backgroundColor: 'rgba(22,163,74,0.12)',
+                        tension: 0.3,
+                        fill: false
                     }
                 ]
             },
@@ -1484,7 +1492,7 @@ function renderSpendingChart(){
                 const pt = points[0];
                 const dataIndex = pt.index;
                 const datasetIndex = pt.datasetIndex;
-                const catId = datasetIndex === 0 ? foodId : otherId;
+                const catId = datasetIndex === 0 ? foodId : datasetIndex === 1 ? otherId : null;
 
                 let start = null;
                 let end = null;
@@ -1537,7 +1545,7 @@ function showExpensesForRange(categoryId, startISO, endISO){
     list.innerHTML = '';
 
     const expenses = data.expenses.filter(e => {
-        return e.category === categoryId && e.date >= startISO && e.date <= endISO;
+        return (categoryId === null || e.category === categoryId) && e.date >= startISO && e.date <= endISO;
     }).sort((a,b)=> a.date.localeCompare(b.date));
 
     if(expenses.length === 0){
