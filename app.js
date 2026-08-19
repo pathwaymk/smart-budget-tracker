@@ -363,34 +363,41 @@ function updateDashboard(){
             dailyEl.innerHTML = `${money(dailyAverage)} <span id="avgTrend" style="margin-left:8px;color:gray">—</span>`;
         }
 
-        // Compare today's total vs yesterday's total for target categories
-        const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
-
-        let todayTotal = 0;
-        let yesterdayTotal = 0;
+        let todayDailyAverage = 0;
+        let yesterdayDailyAverage = 0;
 
         if (targetCategoryIds.length > 0) {
-            todayTotal = data.expenses
-                .filter(e => e.date === todayStr && targetCategoryIds.includes(e.category))
+            const [selectedYear, selectedMonthNumber] = (selectedMonth || thisMonth()).split('-');
+            const yearNumber = Number(selectedYear);
+            const monthNumber = Number(selectedMonthNumber);
+            const daysInSelectedMonth = new Date(yearNumber, monthNumber, 0).getDate();
+            const comparisonDay = selectedMonth === thisMonth()
+                ? new Date().getDate()
+                : daysInSelectedMonth;
+            const previousDay = Math.max(comparisonDay - 1, 1);
+            const monthPrefix = `${yearNumber}-${String(monthNumber).padStart(2, '0')}`;
+            const todayStr = `${monthPrefix}-${String(comparisonDay).padStart(2, '0')}`;
+            const yesterdayStr = `${monthPrefix}-${String(previousDay).padStart(2, '0')}`;
+
+            const spentThroughToday = data.expenses
+                .filter(e => e.date.startsWith(monthPrefix) && e.date <= todayStr && targetCategoryIds.includes(e.category))
                 .reduce((s, e) => s + e.amount, 0);
 
-            yesterdayTotal = data.expenses
-                .filter(e => e.date === yesterdayStr && targetCategoryIds.includes(e.category))
+            const spentThroughYesterday = data.expenses
+                .filter(e => e.date.startsWith(monthPrefix) && e.date <= yesterdayStr && targetCategoryIds.includes(e.category))
                 .reduce((s, e) => s + e.amount, 0);
+
+            todayDailyAverage = spentThroughToday / comparisonDay;
+            yesterdayDailyAverage = spentThroughYesterday / previousDay;
         }
 
         const trendEl = document.getElementById("avgTrend");
         if (trendEl) {
-            if (todayTotal > yesterdayTotal) {
+            if (todayDailyAverage > yesterdayDailyAverage) {
                 trendEl.innerHTML = '<span style="color:red">↑</span>';
-            } else if (todayTotal < yesterdayTotal) {
-                trendEl.innerHTML = '<span style="color:green">↓</span>';
             } else {
-                trendEl.innerHTML = '<span style="color:gray">—</span>';
+                // Show a down arrow when today's value is equal to or below yesterday's.
+                trendEl.innerHTML = '<span style="color:green">↓</span>';
             }
         }
 
